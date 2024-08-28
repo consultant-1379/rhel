@@ -1,0 +1,92 @@
+{
+    "variables": {
+        "vm_name": "aia-rhel72-base",
+        "iso_url": "http://yum.linux.ericsson.se/iso/rhel-server-7.2/rhel-server-7.2-x86_64-dvd.iso",
+        "iso_md5": "51e013512f489203a923a716b408fbdf",
+	"guest_url": "http://download.virtualbox.org/virtualbox/",
+        "user_name":"cloud-user",
+        "group_name":"cloud-user",
+        "home_directory":"/home/cloud-user"
+    },
+    "provisioners": [{
+        "type": "file",
+        "source": "scripts/functions.sh",
+        "destination": "/tmp/functions.sh"
+    }, {
+        "type": "shell",
+        "scripts": [
+            "scripts/base.sh",
+            "scripts/vagrant.sh",
+            "scripts/docker.sh",
+            "scripts/sleep.sh",
+            "scripts/fixkernel.sh",
+            "scripts/vbox_guest.sh",
+            "scripts/cleanup.sh"
+        ],
+        "environment_vars":[
+            "USER_NAME={{user `user_name`}}",
+            "GROUP_NAME={{user `group_name`}}",
+            "HOME_DIRECTORY={{user `home_directory`}}"
+        ],
+        "execute_command": "echo '{{user `user_name`}}'|{{.Vars}} sudo -E -S sh '{{.Path}}'"
+    }],
+    "builders": [{
+        "type": "virtualbox-iso",
+        "vm_name": "{{user `vm_name`}}",
+        "boot_command": [
+            "<tab> text ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/vbox-ks.cfg<enter><wait>"
+        ],
+        "boot_wait": "10s",
+        "disk_size": 50000,
+        "guest_os_type": "RedHat_64",
+        "http_directory": "http",
+        "iso_checksum": "{{user `iso_md5`}}",
+        "iso_checksum_type": "md5",
+        "iso_url": "{{user `iso_url`}}",
+	"guest_additions_url": "{{user `guest_url`}}/{{.Version}}/VBoxGuestAdditions_{{.Version}}.iso",
+        "guest_additions_path": "/tmp/VBoxGuestAdditions_{{.Version}}.iso",
+        "format": "ova",
+        "ssh_username": "vagrant",
+        "ssh_password": "vagrant",
+        "ssh_port": 22,
+        "ssh_wait_timeout": "10000s",
+        "shutdown_command": "echo '/sbin/halt -h -p' > shutdown.sh; echo 'vagrant'|sudo -S sh 'shutdown.sh'",
+        "vboxmanage": [
+            [
+                "modifyvm",
+                "{{.Name}}",
+                "--memory",
+                "4096"
+            ],            
+            [
+                "modifyvm",
+                "{{.Name}}",
+                "--cpus",
+                "2"
+            ],
+            [
+                "modifyvm",
+                "{{.Name}}",
+                "--natpf1",
+                "ssh,tcp,,2222,,22"
+            ]
+        ]
+    },
+    {
+        "flavor": "m1.medium",
+        "image_name": "{{user `vm_name`}}",
+        "source_image": "355be5dc-ca4e-4d07-b507-ee8f270c3112",
+        "ssh_username": "{{user `user_name`}}",
+        "type": "openstack",
+        "region":"RegionOne",
+        "networks": ["66cc63dc-d721-4212-a3b8-436a74af75b3"],
+        "identity_endpoint":"http://131.160.163.101:5000/v2.0",
+        "security_groups":["aia"],
+        "floating_ip_pool":"ecn_floating_net",
+        "ssh_keypair_name":"aia",
+        "ssh_private_key_file":"/home/exuexie/aia.key",
+        "communicator":"ssh",
+        "ssh_pty":"true"
+    }
+    ]
+}
